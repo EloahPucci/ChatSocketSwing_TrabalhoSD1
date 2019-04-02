@@ -1,14 +1,19 @@
 package trabalho1_sd_atual.Service;
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.PrintWriter;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import trabalho1_sd_atual.Mensagem;
 import trabalho1_sd_atual.Mensagem.Acao;
 
@@ -17,15 +22,27 @@ public class ServidorService {
     private ServerSocket serverSocket;
     private Socket conexao;
     private Map<String, ObjectOutputStream> mapaUsuariosOnlines = new HashMap<String, ObjectOutputStream>();
+    InetAddress ipMaquina, nomeMaquina;
+    int portaRemota;
+    FileWriter arquivo;
+    PrintWriter gravarArq;
+    String arq = "";
 
     public ServidorService() {
         try {
+
             serverSocket = new ServerSocket(2000);
+            arquivo = new FileWriter("C:\\Users\\eloah\\Documents\\NetBeansProjects\\ChatSocketSwing_TrabalhoSD1\\src\\trabalho1_sd_atual\\historico.txt");
+            gravarArq = new PrintWriter(arquivo);
 
             while (true) {
                 System.out.println("Aguardando conexão...");
                 conexao = serverSocket.accept();
                 System.out.println("Cliente conectou!");
+
+                ipMaquina = conexao.getInetAddress();
+                nomeMaquina = conexao.getLocalAddress();
+                portaRemota = conexao.getPort();
 
                 new Thread(new ListenerSocket(conexao)).start();
             }
@@ -51,10 +68,15 @@ public class ServidorService {
         @Override
         public void run() {
             Mensagem mensagem = null;
+
             try {
 
                 while ((mensagem = (Mensagem) entrada.readObject()) != null) {
                     Acao acao = mensagem.getAcaoDoCliente();
+
+                    arq += "Nome da máquina: " + nomeMaquina + " / IP da máquina: " + ipMaquina + " / Porta usada: " + portaRemota + " / Mensagem: " + mensagem.getTextoDaMensagem() + "\n";
+                    //gravarArq.println("Nome da máquina: " + nomeMaquina + " / IP da máquina: " + ipMaquina + " / Porta usada: " + portaRemota + " / Mensagem: " + mensagem.getTextoDaMensagem());
+                    System.out.println(mensagem.getTextoDaMensagem());
 
                     switch (acao) {
                         case CONECTAR:
@@ -75,6 +97,7 @@ public class ServidorService {
                             enviar_para_todos(mensagem);
                             break;
                     }
+
                 }
             } catch (IOException | ClassNotFoundException ex) {
                 Mensagem m = new Mensagem();
@@ -82,6 +105,15 @@ public class ServidorService {
                 desconectar(m, saida);
                 enviarListaUsuarios();
                 System.out.println(mensagem.getNomeDoCliente() + " deixou o chat.");
+            } finally {
+                try {
+                    arquivo.write(arq);
+                    if (mapaUsuariosOnlines.isEmpty()) {
+                        arquivo.close();
+                    }
+                } catch (IOException ex) {
+                    Logger.getLogger(ServidorService.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
         }
     }
